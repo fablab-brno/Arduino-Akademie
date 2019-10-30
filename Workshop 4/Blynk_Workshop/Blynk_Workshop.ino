@@ -1,11 +1,12 @@
 #define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
 #include <SPI.h>
 #include <WiFi.h>
-#include <BlynkSimpleEsp32.h>
-#include <SimpleTimer.h>
-#include "DHTesp.h"
-#include "ESP32Ticker.h"
+#include <BlynkSimpleEsp32.h> // Library Manager: Blynk
+#include <SimpleTimer.h> // install from ZIP: https://github.com/jfturcot/SimpleTimer 
+#include "DHTesp.h" // Library Manager: DHT sensor library for ESPx
+#include "ESP32Ticker.h" // install from ZIP: https://github.com/bertmelis/Ticker-esp32
 int LED = 27;
+int buttonLED = 12;
 
 void tempTask(void *pvParameters);
 bool getTemperature();
@@ -14,16 +15,8 @@ void triggerGetTemp();
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
 
-//char auth[] = "a9c86dba839f4863a26a7e078e48405d"; //wsh1@fl.cz : heslo
-//char auth[] = "7c5375f05f7f4c2db38046cf7e2421e1"; //wsh2@fl.cz
-//char auth[] = "939d5f2f780d4f0ba900680b1328b59b"; //wsh3@fl.cz
-//char auth[] = "d38ed57985a04c02b083a7d53b4d4f95"; //wsh4@fl.cz
-//char auth[] = "0025fa895c7743c5821682a3737bb165"; //wsh5@fl.cz
-//char auth[] = "b4369c8d3cc6478683b34132d6655bf8"; //wsh6@fl.cz
-//char auth[] = "de1eddc11e9047a680128ea9703d16c9"; //wsh7@fl.cz
-//char auth[] = "b9180160022d464e898adc5bdae19fba"; //wsh8@fl.cz
-//char auth[] = "ecc7e323529e4dd6b5dff8fb17e29463"; //wsh9@fl.cz
-//char auth[] = "e2924923db264ba99ca490e2956ad860"; //wsh10@fl.cz
+char auth[] = "put_your_uth_here!!"; 
+
 
 // Your WiFi credentials.
 // Set password to "" for open networks.
@@ -50,12 +43,10 @@ TempAndHumidity newValues = dht.getTempAndHumidity();
 // that you define how often to send data to Blynk App.
 void sendSensor()
 {
-
-
-  float pot = 32;   // pin pro pripojeni potenciometru
-  float valor = 0;  // promena pro hodnotu vyctenou z potenciometru
-  float h = dht.getHumidity();
-  float t = dht.getTemperature(); // or dht.readTemperature(true) for Fahrenheit
+  float pot = 32;   // potentiometer pin 
+  float valor = 0;  // variable to store value from potentiometer
+  float h = dht.getHumidity(); // get humidity
+  float t = dht.getTemperature(); // get temperature (dht.readTemperature(true) for Fahrenheit)
 
   if (isnan(h) || isnan(t)) {
     Serial.println("Failed to read from DHT sensor!");
@@ -63,41 +54,43 @@ void sendSensor()
   }
   // You can send any value at any time.
   // Please don't send more that 10 values per second.
-  Blynk.virtualWrite(V5, h);
-  Blynk.virtualWrite(V6, t);
-  Serial.println(t);
-  Serial.println(h);
+  Blynk.virtualWrite(V5, h); //virtual pin to send hunidity
+  Blynk.virtualWrite(V6, t); //virtual pin to send temperature
+  Serial.println("Temp is: " + String(t)); // print temperature to Serial line
+  Serial.println("Humidity is: " + String(h)); // print humidity to Serial line
 
-  valor = analogRead (pot); // Armazena o valor de pot na variavel valor
-  Serial.println(valor);
-  //valor = map(valor, 0, 1023, 0, 50);
-  Blynk.virtualWrite(V7, valor);
-  Blynk.virtualWrite(V8, valor);
+  valor = analogRead (pot); // read value from potentiometer pin
+  Serial.println("Value from potentiometer is: " + String(valor)); // print value from potentiometer to Serial line
+  int valor_map = map(valor, 0, 4095, 0, 100); // map size of potentiometer to 100 pieces
+  Serial.println("Map value is: " + String(valor_map)); //print maped value 
+  Serial.println(); // print empty line
+  Blynk.virtualWrite(V7, valor); // virtual pin for sending potentiometer value
+  Blynk.virtualWrite(V8, valor_map); // virtual pin for sending maped value
 
-  if (valor / 21 < (t) )
+  if (valor_map < (t) ) //if maped value is smaller than temperature
   {
-    digitalWrite(LED, LOW);           //
+    digitalWrite(LED, LOW); // turn buttonLED OFF  
   }
-  else if (valor / 21 > (t) )
+  else if (valor_map > (t) ) //if maped value is smaller than temperature
   {
-    digitalWrite(LED, HIGH);           //
+    digitalWrite(LED, HIGH); // turn buttonLED ON  
 
   }
 
-  WidgetLED  led(V9);
+  WidgetLED  led(V9); // virtual pin for controling LED on breeadboard
 
-  byte leds = digitalRead(LED);
-  if  (leds == 1) {
-    led.off();
+  byte leds = digitalRead(buttonLED); // read buttonLED pin
+  if  (leds == 1) { // if there is nothing.. 
+    led.off(); // ..turn buttonLED OFF
   }
-  else {
-    led.on();
+  else { //..else
+    led.on(); //..turn buttonLED ON
   }
 
-  WidgetLCD lcd(V10);
+  WidgetLCD lcd(V10); // virtual pin for sending text to LCD widget
 
-  lcd.print(5, 0, "Blynk"); // use: (position X: 0-15, position Y: 0-1, "Message you want to print")
-  lcd.print(2, 1, "Workshop");
+  lcd.print(5, 0, "Hello "); // use: (position X: 0-15, position Y: 0-1, "Message you want to print")
+  lcd.print(1, 1, "Arduino Academy");
   // Please use timed events when LCD printintg in void loop to avoid sending too many commands
   // It will cause a FLOOD Error, and connection will be dropped
 
@@ -106,9 +99,10 @@ void sendSensor()
 void setup() {
   {
     Serial.begin(115200); // See the connection status in Serial Monitor
-    Blynk.begin(auth, ssid, pass, "mtm.fablabbrno.cz", 8442);
+    Blynk.begin(auth, ssid, pass);
 
     pinMode (LED, OUTPUT);
+    pinMode (buttonLED, OUTPUT);
     initTemp();
     // Setup a function to be called every second
     timer.setInterval(1000L, sendSensor);
@@ -159,4 +153,3 @@ void tempTask(void *pvParameters) {
     vTaskSuspend(NULL);
   }
 }
-
